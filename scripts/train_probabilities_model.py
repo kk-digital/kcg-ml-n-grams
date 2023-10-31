@@ -24,11 +24,8 @@ def load_dataset(input_path):
     with open(input_path, mode='r', encoding='utf-8',newline='') as file:
         reader = csv.DictReader(file)
         
-        count=0
         # Iterate through each row in the CSV file.
         for row in reader:
-                if(count==5000):
-                    break
                 index = int(row['index'])
                 total_count = int(row['total count'])
                 positive_count = int(row['positive count'])
@@ -49,7 +46,6 @@ def load_dataset(input_path):
                     'phrase_str': phrase_str
                 })
 
-                count+=1
     
     for entry in data:
         entry['total_prob']=math.log(entry['total_prob'] / total_sum) if entry['total_prob'] > 0 else 0.0 
