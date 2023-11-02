@@ -9,7 +9,7 @@ import numpy as np
 
 transformers.logging.set_verbosity_error()
 
-df = pd.read_csv('./output/fc_logprob_results.csv')
+df = pd.read_csv('./data/fc_logprob_results.csv')
 df['cum log prob'] = df['log probability'].cumsum()
 df['cum prob'] = df['probability'].cumsum()
 
