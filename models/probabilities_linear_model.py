@@ -81,9 +81,8 @@ class ProbabilitiesModel:
               X, y,  # Pass your data and labels as arguments
               training_batch_size=10,
               epochs=100,
-              learning_rate=0.05,
-              weight_decay=0.01,
-              normalize=False):
+              learning_rate=0.001,
+              weight_decay=0.00):
         
         training_loss_per_epoch = []
         validation_loss_per_epoch = []
@@ -92,12 +91,8 @@ class ProbabilitiesModel:
         self.model_type = 'probabilities-model'
         self.loss_func_name = "L1"
 
-        if normalize:
-            # If normalize is set to True, normalize the features.
-            X = (X - X.mean()) / X.std()
-
         # Split the data into training and testing sets.
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, shuffle=True)
 
         # Convert data to PyTorch tensors.
         X_train = torch.FloatTensor(X_train)
@@ -109,6 +104,10 @@ class ProbabilitiesModel:
         train_dataset = TensorDataset(X_train, y_train)
         train_loader = DataLoader(train_dataset, batch_size=training_batch_size, shuffle=True)
 
+        # Create DataLoader for validation data
+        validation_dataset = TensorDataset(X_test, y_test)
+        validation_loader = DataLoader(validation_dataset, batch_size=training_batch_size, shuffle=True)
+
         # Training loop
         for epoch in range(epochs):
             self.model.train()  # Set the model to training mode
@@ -117,52 +116,91 @@ class ProbabilitiesModel:
             for batch_x, batch_y in train_loader:
                 optimizer.zero_grad()
                 outputs = self.model(batch_x)
-                loss = self.mse_loss(outputs, batch_y)
+                loss = self.l1_loss(outputs, batch_y)
                 loss.backward()
                 optimizer.step()
-                epoch_training_loss += loss.item()
+                epoch_training_loss += loss.item()*len(batch_x)
 
             # Calculate validation loss
             self.model.eval()  # Set the model to evaluation mode
             with torch.no_grad():
-                validation_outputs = self.model(X_test)
-                validation_loss = self.mse_loss(validation_outputs, y_test).item()
+                validation_loss = 0.0
 
-            epoch_training_loss /= len(train_loader)
+                for batch_x, batch_y in validation_loader:
+                    outputs = self.model(batch_x)
+                    loss = self.l1_loss(outputs, batch_y)
+                    validation_loss += loss.item() * len(batch_x)
+
+            epoch_training_loss /= len(X_train)
+            validation_loss /= len(X_test)
             training_loss_per_epoch.append(epoch_training_loss)
             validation_loss_per_epoch.append(validation_loss)
 
             print(f'Epoch {epoch + 1}/{epochs}, Training Loss: {epoch_training_loss:.4f}, Validation Loss: {validation_loss:.4f}')
 
-        fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+        # Save the model to a .pth file
+        torch.save(self.model.state_dict(), 'model.pth')
+
+        # Calculate residuals for validation
+        with torch.no_grad():
+            validation_outputs = self.model(X_test)
+            validation_residuals = (y_test - validation_outputs.view(-1, 1)).numpy()
+
+        fig, axs = plt.subplots(2, 1, figsize=(12, 10))
+        
+        #info text about the model
+        plt.figtext(0.1, 0.55, "Date = {}\n"
+                            "Dataset = {}\n"
+                            "Network type = {}\n"
+                            "Input type = {}\n"
+                            "Input shape = {}\n"
+                            "Output type= {}\n\n"
+                            ""
+                            "Training size = {}\n"
+                            "Validation size = {}\n\n"
+                            ""
+                            "Learning rate = {}\n"
+                            "Epochs = {}\n"
+                            "Training batch size = {}\n"
+                            "Weight decay = {}\n"
+                            "Loss func = {}\n\n"
+                            ""
+                            "Training loss = {:03.04}\n"
+                            "Validation loss = {:03.04}\n".format(self.date,
+                                                                    'civitai',
+                                                                    'linear',
+                                                                    'clip embedding',
+                                                                    '512',
+                                                                    'log probability',
+                                                                    len(X_train),
+                                                                    len(X_test),
+                                                                    learning_rate,
+                                                                    epochs,
+                                                                    training_batch_size,
+                                                                    weight_decay,
+                                                                    self.loss_func_name,
+                                                                    epoch_training_loss,
+                                                                    validation_loss))
 
         # Plot Validation Loss vs. Epochs
-        axs[0, 0].plot(range(epoch + 1), validation_loss_per_epoch, label='Validation Loss')
-        axs[0, 0].set_xlabel('Epoch')
-        axs[0, 0].set_ylabel('Loss')
-        axs[0, 0].legend()
+        axs[0].plot(range(epoch + 1), training_loss_per_epoch, 'b', label='Training Loss')
+        axs[0].plot(range(epoch + 1), validation_loss_per_epoch, 'r', label='Validation Loss')
+        axs[0].set_xlabel('Epoch')
+        axs[0].set_ylabel('Loss')
+        axs[0].set_title('Loss per epoch')
+        axs[0].legend(['Training Loss', 'Validation Loss'])
 
-        # Plot Actual vs. Predicted Values
-        with torch.no_grad():
-            test_predictions = self.model(X_test).numpy()
-        axs[0, 1].scatter(y_test.numpy(), test_predictions, alpha=0.5)
-        axs[0, 1].set_xlabel('Actual Values')
-        axs[0, 1].set_ylabel('Predicted Values')
+        # plot histogram of residuals
+        axs[1].hist(validation_residuals, bins=30, color='blue', alpha=0.7)
+        axs[1].set_xlabel('Residuals')
+        axs[1].set_ylabel('Frequency')
+        axs[1].set_title('Validation Residual Histogram')
 
-        # Plot Residuals
-        residuals = (y_test - validation_outputs.view(-1, 1)).numpy()
-        axs[1, 0].scatter(test_predictions, residuals, alpha=0.5)
-        axs[1, 0].axhline(0, color='red', linestyle='--')
-        axs[1, 0].set_xlabel('Predicted Values')
-        axs[1, 0].set_ylabel('Residuals')
+        # Adjust spacing between subplots
+        plt.subplots_adjust(hspace=0.7, left=0.5)
 
-        # Plot Distribution of Residuals
-        axs[1, 1].hist(residuals, bins=30, color='blue', alpha=0.7)
-        axs[1, 1].set_xlabel('Residuals')
-        axs[1, 1].set_ylabel('Frequency')
-
-        plt.tight_layout()
-
+        # Save the figure to a file
+        plt.savefig('linear_model.png')
         plt.show()
         return self.model, training_loss_per_epoch, validation_loss_per_epoch
 
