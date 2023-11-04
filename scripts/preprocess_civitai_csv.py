@@ -3,6 +3,10 @@ import numpy as np
 
 import argparse
 
+from transformers import CLIPTokenizer
+
+tokenizer = CLIPTokenizer.from_pretrained('openai/clip-vit-large-patch14')
+
 def filter_civitai(df):
     # Remove rows with unicode characters
     df = df[df['phrase str'].apply(lambda x: isinstance(x, str) and all(ord(char) < 128 for char in x))]
@@ -23,6 +27,12 @@ def add_features(df):
     """
     df['probability'] = df['positive count'] / df['positive count'].sum()
     df['log probability'] = np.log(df['probability'] + 1e-15)
+
+    def get_phrase_length(row):
+        token_encoding = tokenizer(row['phrase str'], return_length=True, return_tensors='pt')
+        return token_encoding['length'].item()
+    
+    df['token_length'] = df.apply(get_phrase_length, axis=1)
 
     return df
 
