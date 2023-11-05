@@ -34,8 +34,8 @@ def sampling_algo1(data_path):
         phrase = row['phrase str']
 
         # check if prompt length exceeds 75 tokens
-        tokens = tokenizer.tokenize(phrase + ', ')
-        prompt_length += len(tokens)
+        # tokens = tokenizer.tokenize(phrase + ', ')
+        prompt_length += row['token_length']
         if prompt_length >= 75:
             break
 

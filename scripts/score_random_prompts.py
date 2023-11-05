@@ -11,6 +11,7 @@ import glob
 import os
 import json
 
+from scipy import stats
 from utility.msgpack_dataloader import read_msg_pack
 from models.ab_ranking_elm_v1 import ABRankingELMModel
 from models.ab_ranking_linear import ABRankingModel
@@ -69,7 +70,7 @@ def main(
     df_result['tokens'] = df_result['positive_prompt'].str.split(', ')
 
     # scores of prompts that have a certain phrase
-    phrase_scores = {phrase: {'elm_score': [], 'linear_score': []} for phrase in df['phrase str'].tolist()}
+    phrase_scores = {phrase: {'elm_average_score': [], 'linear_average_score': []} for phrase in df['phrase str'].tolist()}
 
     # for each phrase, store the prompts that contain the phrase
     phrase_prompts = {phrase: [] for phrase in df['phrase str'].tolist()}
@@ -79,18 +80,38 @@ def main(
         tokens = row['tokens']
 
         for token in tokens:
-            phrase_scores[token]['elm_score'].append(row['elm_score'])
-            phrase_scores[token]['linear_score'].append(row['linear_score'])
+            phrase_scores[token]['elm_average_score'].append(row['elm_score'])
+            phrase_scores[token]['linear_average_score'].append(row['linear_score'])
             phrase_prompts[token].append(row['positive_prompt'])
 
     # get average scores
     df_phrase_scores = pd.DataFrame(phrase_scores).T
     df_phrase_scores = df_phrase_scores.map(lambda x: sum(x) / len(x) if len(x) > 0 else 0)
 
+    df_phrase_scores = df_phrase_scores[
+        ~((df_phrase_scores['elm_average_score'] == 0) & (df_phrase_scores['linear_average_score'] == 0))
+    ]
+
+    # compute percentiles
+    print('[*] Computing percentiles')
+    df_phrase_scores['elm_percentile'] = df_phrase_scores['elm_average_score'].apply(
+        lambda x: stats.percentileofscore(df_phrase_scores['elm_average_score'], x)
+    )
+    df_phrase_scores['linear_percentile'] = df_phrase_scores['linear_average_score'].apply(
+        lambda x: stats.percentileofscore(df_phrase_scores['linear_average_score'], x)
+    )
+
+    # add token lengths to dataframe
+    df_phrase_scores['phrase'] = df_phrase_scores.index
+    df_phrase_scores = df_phrase_scores.reset_index(drop=True)
+    df_phrase_scores = df_phrase_scores.merge(df[['phrase str', 'token_length']], left_on='phrase', right_on='phrase str', how='left')
+    df_phrase_scores = df_phrase_scores[['phrase', 'token_length', 'elm_average_score', 'elm_percentile', 'linear_average_score', 'linear_percentile']]
+    
+    os.makedirs(results_save_path, exist_ok=True)
     with open(os.path.join(results_save_path, 'phrase_prompts.json'), 'w') as f:
         json.dump(phrase_prompts, f, indent=2)
 
-    df_phrase_scores.to_csv(os.path.join(results_save_path, 'phrase_scores.csv'))
+    df_phrase_scores.to_csv(os.path.join(results_save_path, 'phrase_scores.csv'), index=False)
     df_result.to_csv(os.path.join(results_save_path, 'results.csv'))
 
 if __name__ == '__main__':
