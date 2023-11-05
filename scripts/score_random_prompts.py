@@ -94,18 +94,34 @@ def main(
 
     # compute percentiles
     print('[*] Computing percentiles')
-    df_phrase_scores['elm_percentile'] = df_phrase_scores['elm_average_score'].apply(
-        lambda x: stats.percentileofscore(df_phrase_scores['elm_average_score'], x)
-    )
-    df_phrase_scores['linear_percentile'] = df_phrase_scores['linear_average_score'].apply(
-        lambda x: stats.percentileofscore(df_phrase_scores['linear_average_score'], x)
-    )
+    def percentile_rank(column):
+        return column.rank(pct=True)
+    
+    df_phrase_scores['elm_percentile'] = percentile_rank(df_phrase_scores['elm_average_score'])
+    df_phrase_scores['linear_percentile'] = percentile_rank(df_phrase_scores['linear_average_score'])
 
     # add token lengths to dataframe
     df_phrase_scores['phrase'] = df_phrase_scores.index
     df_phrase_scores = df_phrase_scores.reset_index(drop=True)
     df_phrase_scores = df_phrase_scores.merge(df[['phrase str', 'token_length']], left_on='phrase', right_on='phrase str', how='left')
-    df_phrase_scores = df_phrase_scores[['phrase', 'token_length', 'elm_average_score', 'elm_percentile', 'linear_average_score', 'linear_percentile']]
+
+    # binned percentiles
+    df_phrase_scores['elm_percentile_bin'] = pd.qcut(df_phrase_scores['elm_percentile'], q=4, labels=False)
+    df_phrase_scores['linear_percentile_bin'] = pd.qcut(df_phrase_scores['linear_percentile'], q=4, labels=False)
+
+    # add number of prompts for each phrase
+    for phrase, prompts in phrase_prompts.items():
+        retrieved_row = df_phrase_scores.loc[df_phrase_scores['phrase'] == phrase]
+        if len(retrieved_row) == 0:
+            continue
+        else:
+            index = retrieved_row.index[0]
+        df_phrase_scores.at[index, 'n_prompts'] = len(prompts)
+
+    df_phrase_scores = df_phrase_scores[
+        ['phrase', 'token_length', 'n_prompts', 'elm_average_score', 'elm_percentile', 'elm_percentile_bin',
+          'linear_average_score', 'linear_percentile', 'linear_percentile_bin']
+    ]
     
     os.makedirs(results_save_path, exist_ok=True)
     with open(os.path.join(results_save_path, 'phrase_prompts.json'), 'w') as f:
