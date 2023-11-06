@@ -1,10 +1,10 @@
 # kcg-ml-n-grams  
 
 ## Simple Prompt Generator  
-Preprocess the civitai csv file first
+Preprocess the dataset csv file first
 ```
-$ python scripts/preprocess_civitai_csv.py \
-    --data_csv_path <civitai csv file with phrases>
+$ python scripts/preprocess_dataset_csv.py \
+    --data_csv_path <csv file with phrases, positive and negative counts>
     --output_path <output path to save processed csv file>
 ```
 
