@@ -7,11 +7,19 @@ import numpy as np
 from utility.msgpack_dataloader import read_msg_pack
 from itertools import chain
 from collections import Counter
+from transformers import CLIPTokenizer, CLIPTextModel
 
 import glob
 import tqdm
 import os
+import torch
 import argparse
+import transformers
+
+transformers.logging.set_verbosity_error()
+
+tokenizer = CLIPTokenizer.from_pretrained('openai/clip-vit-large-patch14')
+model = CLIPTextModel.from_pretrained('openai/clip-vit-large-patch14').eval().to('cuda')
 
 def create_ngrams(vocab, n):
     ngram_data = []
@@ -25,6 +33,12 @@ def create_ngrams(vocab, n):
         ngram_data.append(ngram)
 
     return ngram_data
+
+def get_token_length(row):
+    with torch.no_grad():
+        token_encoding = tokenizer(row['phrase str'], return_length=True, return_tensors='pt')
+
+    return token_encoding['length'].item()
 
 def count_positive_negative_phrase(df, ngram):
     positive_prompt_tokens = df['positive_prompt'].str.split(', ').tolist()
@@ -42,13 +56,14 @@ def count_positive_negative_phrase(df, ngram):
     positive_phrase_counts = pd.DataFrame(Counter(positive_tokens_chain), index=['positive count']).T
     negative_phrase_counts = pd.DataFrame(Counter(negative_tokens_chain), index=['negative count']).T
 
-    df_phrase_scores = positive_phrase_counts.merge(negative_phrase_counts, how='outer', left_index=True, right_index=True)
-    df_phrase_scores = df_phrase_scores.fillna(0).astype(np.int32)
-    df_phrase_scores['phrase str'] = df_phrase_scores.index
-    df_phrase_scores = df_phrase_scores.reset_index(drop=True)
-    df_phrase_scores = df_phrase_scores[['phrase str', 'positive count', 'negative count']]
+    df_phrase_counts = positive_phrase_counts.merge(negative_phrase_counts, how='outer', left_index=True, right_index=True)
+    df_phrase_counts = df_phrase_counts.fillna(0).astype(np.int32)
+    df_phrase_counts['phrase str'] = df_phrase_counts.index
+    df_phrase_counts['token_length'] = df_phrase_counts.apply(get_token_length, axis=1)
+    df_phrase_counts = df_phrase_counts.reset_index(drop=True)
+    df_phrase_counts = df_phrase_counts[['phrase str', 'token_length', 'positive count', 'negative count']]
 
-    return df_phrase_scores
+    return df_phrase_counts
 
 def main(data_path, ngram, save_path):
     file_paths = sorted(glob.glob(os.path.join(data_path, '*_embedding.msgpack')))
@@ -60,11 +75,11 @@ def main(data_path, ngram, save_path):
         df.append(data)
 
     df = pd.DataFrame(df)
-    df_phrase_scores = count_positive_negative_phrase(df, ngram)
+    df_phrase_counts = count_positive_negative_phrase(df, ngram)
 
     os.makedirs(save_path, exist_ok=True)
     df.to_csv(os.path.join(save_path, 'environment_data.csv'), index=False)
-    df_phrase_scores.to_csv(os.path.join(save_path, f'environment_{ngram}-gram.csv'), index=False)
+    df_phrase_counts.to_csv(os.path.join(save_path, f'environment_{ngram}-gram.csv'), index=False)
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
