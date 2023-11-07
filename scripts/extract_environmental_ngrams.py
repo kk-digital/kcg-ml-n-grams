@@ -21,6 +21,13 @@ transformers.logging.set_verbosity_error()
 tokenizer = CLIPTokenizer.from_pretrained('openai/clip-vit-large-patch14')
 model = CLIPTextModel.from_pretrained('openai/clip-vit-large-patch14').eval().to('cuda')
 
+# max token length and character length constraints for n-grams
+ngram_constraints = {
+    1: {'max_token_length': 20, 'max_phrase_length': 150},
+    2: {'max_token_length': 40, 'max_phrase_length': 150},
+    3: {'max_token_length': 60, 'max_phrase_length': 200}
+}
+
 def create_ngrams(vocab, n):
     ngram_data = []
     max_index = len(vocab) - n + 1
@@ -39,6 +46,21 @@ def get_token_length(row):
         token_encoding = tokenizer(row['phrase str'], return_length=True, return_tensors='pt')
 
     return token_encoding['length'].item()
+
+def filter_phrase(df, max_phrase_length=150, max_token_length=20):
+    # Remove rows with unicode characters
+    df = df[df['phrase str'].apply(lambda x: isinstance(x, str) and all(ord(char) < 128 for char in x))]
+
+    # Remove rows with tab
+    df = df[df['phrase str'].str.contains('\t|\n|\r|\b') == False]
+
+    # Remove rows with more than 100 characters
+    df = df[(df['phrase str'].str.len() <= max_phrase_length) & (df['phrase str'].str.len() > 0)]
+
+    # Remove rows with token length more than 20
+    df = df[df['token_length'] <= max_token_length]
+
+    return df
 
 def count_positive_negative_phrase(df, ngram):
     positive_prompt_tokens = df['positive_prompt'].str.split(', ').tolist()
@@ -61,6 +83,8 @@ def count_positive_negative_phrase(df, ngram):
     df_phrase_counts['phrase str'] = df_phrase_counts.index
     df_phrase_counts['token_length'] = df_phrase_counts.apply(get_token_length, axis=1)
     df_phrase_counts = df_phrase_counts.reset_index(drop=True)
+
+    df_phrase_counts = filter_phrase(df_phrase_counts)
     df_phrase_counts = df_phrase_counts[['phrase str', 'token_length', 'positive count', 'negative count']]
 
     return df_phrase_counts
