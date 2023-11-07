@@ -1,3 +1,5 @@
+# adds log probability, probability based on positive counts to data csv 
+
 import pandas as pd
 import numpy as np
 
