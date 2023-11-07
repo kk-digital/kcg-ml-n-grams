@@ -61,10 +61,6 @@ def main(
 
     df_result = pd.DataFrame(df_result)
 
-    # filter prompts with unicode and tab characters
-    df_result = df_result[df_result['positive_prompt'].str.contains('\t') == False]
-    df_result = df_result[df_result['positive_prompt'].apply(lambda x: isinstance(x, str) and all(ord(char) < 128 for char in x))]
-
     df_result['tokens'] = df_result['positive_prompt'].str.split(', ')
 
     # scores of prompts that have a certain phrase
