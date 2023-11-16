@@ -43,7 +43,13 @@ def main(
     linear_model_weights,
     results_save_path
 ):
-    prompt_file_paths = sorted(glob.glob(os.path.join(prompt_path, '*_embedding.msgpack')))
+    prompt_file_paths = []
+    for root, dirs, files in os.walk(prompt_file_paths):
+        for file in files:
+            if file.endswith('_embedding.msgpack'):
+                prompt_file_paths.append(os.path.join(root, file)
+    prompt_file_paths = sorted(prompt_file_paths)
+
     elm_model, linear_model = load_models(
         elm_model_weights,
         linear_model_weights
