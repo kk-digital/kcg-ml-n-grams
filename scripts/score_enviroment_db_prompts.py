@@ -118,8 +118,8 @@ def main(
     df_phrase_scores = df_phrase_scores.merge(df[['phrase str', 'token_length']], left_on='phrase', right_on='phrase str', how='left')
 
     # binned percentiles
-    df_phrase_scores['elm_percentile_bin'] = pd.qcut(df_phrase_scores['elm_percentile'], q=3, labels=False)
-    df_phrase_scores['linear_percentile_bin'] = pd.qcut(df_phrase_scores['linear_percentile'], q=3, labels=False)
+    df_phrase_scores['elm_percentile_bin'] = pd.qcut(df_phrase_scores['elm_percentile'], q=4, labels=False)
+    df_phrase_scores['linear_percentile_bin'] = pd.qcut(df_phrase_scores['linear_percentile'], q=4, labels=False)
 
     # add number of prompts for each phrase
     for phrase, prompts in phrase_prompts.items():
