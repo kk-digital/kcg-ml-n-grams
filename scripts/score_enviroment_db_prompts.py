@@ -38,7 +38,7 @@ def load_models(
 
 def main(
     prompt_path,
-    # data_csv_path,
+    data_csv_path,
     elm_model_weights,
     linear_model_weights,
     results_save_path
@@ -49,7 +49,7 @@ def main(
         linear_model_weights
     )
     # ngram / phrase csv
-    # df = pd.read_csv(data_csv_path)
+    df = pd.read_csv(data_csv_path)
     ngram_list = df['phrase str'].tolist()
 
     df_result = []
@@ -147,7 +147,7 @@ def main(
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--prompt_path', type=str, required=True, help='Path to msgpack of generated prompts')
-    # ap.add_argument('--data_csv_path', type=str, required=True, help='Path to CSV file with phrases')
+    ap.add_argument('--data_csv_path', type=str, required=True, help='Path to CSV file with phrases')
     ap.add_argument('--linear_model_weights', type=str, required=True, help='Linear ranking model weights path')
     ap.add_argument('--elm_model_weights', type=str, required=True, help='ELM ranking model weights path')
     ap.add_argument('--results_save_path', type=str, required=True, help='Results save path')
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     start = time.time()
     main(
         prompt_path=args.prompt_path,
-        # data_csv_path=args.data_csv_path,
+        data_csv_path=args.data_csv_path,
         linear_model_weights=args.linear_model_weights,
         elm_model_weights=args.elm_model_weights,
         results_save_path=args.results_save_path
