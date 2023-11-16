@@ -49,7 +49,7 @@ def main(
         linear_model_weights
     )
     # ngram / phrase csv
-    df = pd.read_csv(data_csv_path)
+    # df = pd.read_csv(data_csv_path)
     ngram_list = df['phrase str'].tolist()
 
     df_result = []
